@@ -10,31 +10,39 @@ class CPU:
         self.ram  = [0] * 256
         self.pc = 0
         self.reg = [0] * 8
-        self.op_size = 1
+        self.op_size = None
         self.LDI = 0b10000010
         self.PRN = 0b01000111
         self.HLT = 0b00000001
+        self.MUL = 0b10100010
 
-    def load(self):
+    def load(self, filename):
         """Load a program into memory."""
 
         address = 0
 
         # For now, we've just hardcoded a program:
 
-        program = [
-            # From print8.ls8
-            0b10000010, # LDI R0,8
-            0b00000000,
-            0b00001000,
-            0b01000111, # PRN R0
-            0b00000000,
-            0b00000001, # HLT
-        ]
+        # program = [
+        #     # From print8.ls8
+        #     0b10000010, # LDI R0,8
+        #     0b00000000,
+        #     0b00001000,
+        #     0b01000111, # PRN R0
+        #     0b00000000,
+        #     0b00000001, # HLT
+        # ]
 
-        for instruction in program:
-            self.ram[address] = instruction
-            address += 1
+        with open(sys.argv[1]) as f:
+            for line in f:
+                line = line.split("#") # remove the #'s and isolate the binary value we need
+                number = line[0].strip() # take out the \n's
+                if number != '':
+                    binary = int(number, 2) # convert to int with the base of 2 since we are passing in a b value
+
+                    self.ram[address] = binary
+
+                    address += 1
 
 
     def alu(self, op, reg_a, reg_b):
@@ -44,6 +52,8 @@ class CPU:
             self.reg[reg_a] += self.reg[reg_b]
         elif op == "SUB":
             self.reg[reg_a] -= self.reg[reg_b]
+        elif op == "MUL":
+            self.reg[reg_a] *= self.reg[reg_b]
         else:
             raise Exception("Unsupported ALU operation")
 
@@ -85,21 +95,29 @@ class CPU:
 
                 self.reg[reg_index] = num_for_reg
 
-                self.op_size = 3
+                self.op_size = cmd >> 6
 
             elif cmd == self.PRN:
                 reg_index = self.ram[self.pc + 1]
                 
                 print(self.reg[reg_index])
 
-                self.op_size = 2
+                self.op_size = cmd >> 6
+            
+            elif cmd == self.MUL:
+                reg_a = self.ram[self.pc + 1]
+                reg_b = self.ram[self.pc + 2]
+
+                self.alu("MUL", reg_a, reg_b)
+
+                self.op_size = cmd >> 6
 
             elif cmd == self.HLT:
                 running = False
 
-                self.op_size = 1
+                self.op_size = cmd >> 6
 
-            self.pc += self.op_size
+            self.pc += self.op_size + 1
         
 
 
