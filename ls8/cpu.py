@@ -11,10 +11,13 @@ class CPU:
         self.pc = 0
         self.reg = [0] * 8
         self.op_size = None
+        self.sp = 7
         self.LDI = 0b10000010
         self.PRN = 0b01000111
         self.HLT = 0b00000001
         self.MUL = 0b10100010
+        self.PUSH = 0b01000101
+        self.POP = 0b01000110
 
     def load(self, filename):
         """Load a program into memory."""
@@ -114,6 +117,26 @@ class CPU:
 
             elif cmd == self.HLT:
                 running = False
+
+                self.op_size = cmd >> 6
+
+            elif cmd == self.PUSH:
+                reg_index = self.ram[self.pc + 1]
+                value = self.reg[reg_index]
+
+                self.reg[self.sp] -= 1
+
+                self.ram[self.reg[self.sp]] = value
+
+                self.op_size = cmd >> 6
+                
+            elif cmd == self.POP:
+                reg_index = self.ram[self.pc + 1]
+                value = self.ram[self.reg[self.sp]]
+
+                self.reg[reg_index] = value
+
+                self.reg[self.sp] += 1
 
                 self.op_size = cmd >> 6
 
