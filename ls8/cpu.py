@@ -16,8 +16,11 @@ class CPU:
         self.PRN = 0b01000111
         self.HLT = 0b00000001
         self.MUL = 0b10100010
+        self.ADD = 0b10100000
         self.PUSH = 0b01000101
         self.POP = 0b01000110
+        self.CALL = 0b01010000
+        self.RET = 0b00010001
 
     def load(self, filename):
         """Load a program into memory."""
@@ -36,7 +39,7 @@ class CPU:
         #     0b00000001, # HLT
         # ]
 
-        with open(sys.argv[1]) as f:
+        with open(filename) as f:
             for line in f:
                 line = line.split("#") # remove the #'s and isolate the binary value we need
                 number = line[0].strip() # take out the \n's
@@ -89,36 +92,47 @@ class CPU:
     def run(self):
         """Run the CPU."""
         running = True
+        self.reg[self.sp] = 0xf4
+        
         while running:
             cmd = self.ram_read(self.pc)
-
+            
             if cmd == self.LDI:
                 reg_index = self.ram[self.pc + 1]
                 num_for_reg = self.ram[self.pc + 2]
 
                 self.reg[reg_index] = num_for_reg
 
-                self.op_size = cmd >> 6
+                self.op_size = (cmd >> 6) + 1
 
             elif cmd == self.PRN:
                 reg_index = self.ram[self.pc + 1]
                 
                 print(self.reg[reg_index])
 
-                self.op_size = cmd >> 6
+                self.op_size = (cmd >> 6) + 1
             
+
+            elif cmd == self.ADD:
+                reg_a = self.ram[self.pc + 1]
+                reg_b = self.ram[self.pc + 2]
+
+                self.alu("ADD", reg_a, reg_b)
+
+                self.op_size = (cmd >> 6) + 1
+
             elif cmd == self.MUL:
                 reg_a = self.ram[self.pc + 1]
                 reg_b = self.ram[self.pc + 2]
 
                 self.alu("MUL", reg_a, reg_b)
 
-                self.op_size = cmd >> 6
+                self.op_size = (cmd >> 6) + 1
 
             elif cmd == self.HLT:
                 running = False
 
-                self.op_size = cmd >> 6
+                self.op_size = (cmd >> 6) + 1
 
             elif cmd == self.PUSH:
                 reg_index = self.ram[self.pc + 1]
@@ -128,7 +142,7 @@ class CPU:
 
                 self.ram[self.reg[self.sp]] = value
 
-                self.op_size = cmd >> 6
+                self.op_size = (cmd >> 6) + 1
                 
             elif cmd == self.POP:
                 reg_index = self.ram[self.pc + 1]
@@ -138,9 +152,24 @@ class CPU:
 
                 self.reg[self.sp] += 1
 
-                self.op_size = cmd >> 6
+                self.op_size = (cmd >> 6) + 1
+            
+            elif cmd == self.CALL:
+                self.reg[self.sp] -= 1
+                self.ram[self.reg[self.sp]] = (self.pc + 2)
 
-            self.pc += self.op_size + 1
+                reg_index = self.ram[self.pc + 1]
+                self.pc = self.reg[reg_index]
+
+                self.op_size = 0
+
+            elif cmd == self.RET:
+                self.pc = self.ram[self.reg[self.sp]]
+                self.reg[self.sp] += 1
+
+                self.op_size = 0
+
+            self.pc += self.op_size
         
 
 
