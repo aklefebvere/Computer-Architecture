@@ -122,44 +122,60 @@ class CPU:
         print()
 
     def ram_read(self, address):
+        # return the value at an address
         return self.ram[address]
 
     def ram_write(self, address, value):
+        # write a value into an address
         self.ram[address] = value
     
     def run(self):
         """Run the CPU."""
+        # running variable to keep while loop running
         running = True
+        # Define SP ram index
         self.reg[self.sp] = 0xf4
 
+        # while loop util HALT
         while running:
+            # current command
             cmd = self.ram_read(self.pc)
+            # first value for cmd (if any)
             reg_a = self.ram[self.pc + 1]
+            # second value for cmd (if any)
             reg_b = self.ram[self.pc + 2]
+            # default op size for all commands unless overwritten
             self.op_size = (cmd >> 6) + 1
             
+            # set a value to a certain reg index in the register
             if cmd == self.LDI:
                 self.reg[reg_a] = reg_b
-
+            
+            # print out a value from a certain reg index
             elif cmd == self.PRN:
                 print(self.reg[reg_a])
 
+            # add two values together, storing the result in reg_a
             elif cmd == self.ADD:
                 self.alu("ADD", reg_a, reg_b)
 
+            # multiply two values together, storing the result in reg_a
             elif cmd == self.MUL:
                 self.alu("MUL", reg_a, reg_b)
 
+            # set running to False so the while loop will exit and stop the cpu
             elif cmd == self.HLT:
                 running = False
-
+            
+            # push a value onto the stack stored in the ram
             elif cmd == self.PUSH:
                 value = self.reg[reg_a]
 
                 self.reg[self.sp] -= 1
 
                 self.ram[self.reg[self.sp]] = value
-
+            
+            # pop off a value off the stack stored in the ram
             elif cmd == self.POP:
                 value = self.ram[self.reg[self.sp]]
 
@@ -167,65 +183,78 @@ class CPU:
 
                 self.reg[self.sp] += 1
 
-            
+            # Save the location of the next command and jump to the given index in the reg
             elif cmd == self.CALL:
                 self.reg[self.sp] -= 1
                 self.ram[self.reg[self.sp]] = (self.pc + 2)
 
                 self.pc = self.reg[reg_a]
+                # op size is zero because we moved to a certain index
                 self.op_size = 0
 
+            # return to the previously saved command
             elif cmd == self.RET:
                 self.pc = self.ram[self.reg[self.sp]]
                 self.reg[self.sp] += 1
-
+                # op size is zero because we moved to a certain index
                 self.op_size = 0
 
+            # Sets the flags values
+            # [1,0,0] = value at reg_a < value at reg_b
+            # [0,1,0] = value at reg_a > value at reg_b
+            # [0,0,1] = value at reg_a == value at reg_b
             elif cmd == self.CMP:
                 self.alu("CMP", reg_a, reg_b)
-
+            
+            # jump to the given index
             elif cmd == self.JMP:
                 self.pc = self.reg[reg_a]
-
+                # sinced we jumped to a different index, set op size to 0
                 self.op_size = 0
-            
+            # check if the equal flag is set to 1 (true)
+            # if it is, go to the given index stored in the reg
             elif cmd == self.JEQ:
                 if self.flags[2] == 1:
                     self.pc = self.reg[reg_a]
                     self.op_size = 0
-                
+            # check if the equal flag is set to 0 (false)
+            # if it is, go to the given index stored in the reg    
             elif cmd == self.JNE:
                 if self.flags[2] == 0:
                     self.pc = self.reg[reg_a]
                     self.op_size = 0
 
+            # Perform a bitwise and on reg_a and reg_b storing the value in reg_a
             elif cmd == self.AND:
                 self.alu("AND", reg_a, reg_b)
 
+            # Perform a bitwise or on reg_a and reg_b storing the value in reg_a
             elif cmd == self.OR:
                 self.alu("OR", reg_a, reg_b)
 
+            # Perform a bitwise XOR on reg_a and reg_b storing the value in reg_a
             elif cmd == self.XOR:
                 self.alu("XOR", reg_a, reg_b)
 
+            # Perform a bitwise not on reg_a
             elif cmd == self.NOT:
                 self.alu("NOT", reg_a, reg_b)
 
+            # Perform a bitwise left shift on reg_a and reg_b storing the value in reg_a
             elif cmd == self.SHL:
                 self.alu("SHL", reg_a, reg_b)
 
+            # Perform a bitwise right shift on reg_a and reg_b storing the value in reg_a
             elif cmd == self.SHR:
                 self.alu("SHR", reg_a, reg_b)
 
+            # Perform a modulo on reg_a and reg_b storing the remainder in reg_a
+            # if the value at reg_b is 0, halt the cpu
             elif cmd == self.MOD:
                 check = self.alu("MOD", reg_a, reg_b)
                 if check == 0:
                     print('Error: divide by zero error, halting')
                     running = False
-            
-
-            
-
             
             self.pc += self.op_size
         
