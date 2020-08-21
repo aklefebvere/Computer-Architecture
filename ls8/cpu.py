@@ -12,6 +12,7 @@ class CPU:
         self.reg = [0] * 8
         self.op_size = None
         self.sp = 7
+        self.flags = [0,0,0]
         self.LDI = 0b10000010
         self.PRN = 0b01000111
         self.HLT = 0b00000001
@@ -21,6 +22,17 @@ class CPU:
         self.POP = 0b01000110
         self.CALL = 0b01010000
         self.RET = 0b00010001
+        self.CMP = 0b10100111
+        self.JMP = 0b01010100
+        self.JEQ = 0b01010101
+        self.JNE = 0b01010110
+        self.AND = 0b10101000
+        self.OR = 0b10101010
+        self.XOR = 0b10101011
+        self.NOT = 0b01101001
+        self.SHL = 0b10101100
+        self.SHR = 0b10101101
+        self.MOD = 0b10100100
 
     def load(self, filename):
         """Load a program into memory."""
@@ -59,7 +71,33 @@ class CPU:
         elif op == "SUB":
             self.reg[reg_a] -= self.reg[reg_b]
         elif op == "MUL":
-            self.reg[reg_a] *= self.reg[reg_b]
+            self.reg[reg_a] *= self.reg[reg_a]
+        elif op == "CMP":
+            if self.reg[reg_a] < self.reg[reg_b]:
+                self.flags = [1,0,0]
+            elif self.reg[reg_a] > self.reg[reg_b]:
+                self.flags = [0,1,0]
+            elif self.reg[reg_a] == self.reg[reg_b]:
+                self.flags = [0,0,1]
+        elif op == "AND":
+            self.reg[reg_a] & self.reg[reg_b]
+        elif op == "OR":
+            self.reg[reg_a] | self.reg[reg_b]
+        elif op == "XOR":
+            self.reg[reg_a] ^ self.reg[reg_b]
+        elif op == "NOT":
+            self.reg[reg_a] = ~self.reg[reg_a]
+        elif op == "SHL":
+            self.reg[reg_a] <<= self.reg[reg_b]
+        elif op == "SHR":
+            self.reg[reg_a] >>= self.reg[reg_b]
+        elif op == "MOD":
+            if self.reg[reg_b] == 0:
+                return 0
+            else:
+                remainder = self.reg[reg_a] % self.reg[reg_b]
+                self.reg[reg_a] = remainder
+
         else:
             raise Exception("Unsupported ALU operation")
 
@@ -93,74 +131,48 @@ class CPU:
         """Run the CPU."""
         running = True
         self.reg[self.sp] = 0xf4
-        
+
         while running:
             cmd = self.ram_read(self.pc)
+            reg_a = self.ram[self.pc + 1]
+            reg_b = self.ram[self.pc + 2]
+            self.op_size = (cmd >> 6) + 1
             
             if cmd == self.LDI:
-                reg_index = self.ram[self.pc + 1]
-                num_for_reg = self.ram[self.pc + 2]
-
-                self.reg[reg_index] = num_for_reg
-
-                self.op_size = (cmd >> 6) + 1
+                self.reg[reg_a] = reg_b
 
             elif cmd == self.PRN:
-                reg_index = self.ram[self.pc + 1]
-                
-                print(self.reg[reg_index])
-
-                self.op_size = (cmd >> 6) + 1
-            
+                print(self.reg[reg_a])
 
             elif cmd == self.ADD:
-                reg_a = self.ram[self.pc + 1]
-                reg_b = self.ram[self.pc + 2]
-
                 self.alu("ADD", reg_a, reg_b)
 
-                self.op_size = (cmd >> 6) + 1
-
             elif cmd == self.MUL:
-                reg_a = self.ram[self.pc + 1]
-                reg_b = self.ram[self.pc + 2]
-
                 self.alu("MUL", reg_a, reg_b)
-
-                self.op_size = (cmd >> 6) + 1
 
             elif cmd == self.HLT:
                 running = False
 
-                self.op_size = (cmd >> 6) + 1
-
             elif cmd == self.PUSH:
-                reg_index = self.ram[self.pc + 1]
-                value = self.reg[reg_index]
+                value = self.reg[reg_a]
 
                 self.reg[self.sp] -= 1
 
                 self.ram[self.reg[self.sp]] = value
 
-                self.op_size = (cmd >> 6) + 1
-                
             elif cmd == self.POP:
-                reg_index = self.ram[self.pc + 1]
                 value = self.ram[self.reg[self.sp]]
 
-                self.reg[reg_index] = value
+                self.reg[reg_a] = value
 
                 self.reg[self.sp] += 1
 
-                self.op_size = (cmd >> 6) + 1
             
             elif cmd == self.CALL:
                 self.reg[self.sp] -= 1
                 self.ram[self.reg[self.sp]] = (self.pc + 2)
 
-                reg_index = self.ram[self.pc + 1]
-                self.pc = self.reg[reg_index]
-
+                self.pc = self.reg[reg_a]
                 self.op_size = 0
 
             elif cmd == self.RET:
@@ -169,6 +181,52 @@ class CPU:
 
                 self.op_size = 0
 
+            elif cmd == self.CMP:
+                self.alu("CMP", reg_a, reg_b)
+
+            elif cmd == self.JMP:
+                self.pc = self.reg[reg_a]
+
+                self.op_size = 0
+            
+            elif cmd == self.JEQ:
+                if self.flags[2] == 1:
+                    self.pc = self.reg[reg_a]
+                    self.op_size = 0
+                
+            elif cmd == self.JNE:
+                if self.flags[2] == 0:
+                    self.pc = self.reg[reg_a]
+                    self.op_size = 0
+
+            elif cmd == self.AND:
+                self.alu("AND", reg_a, reg_b)
+
+            elif cmd == self.OR:
+                self.alu("OR", reg_a, reg_b)
+
+            elif cmd == self.XOR:
+                self.alu("XOR", reg_a, reg_b)
+
+            elif cmd == self.NOT:
+                self.alu("NOT", reg_a, reg_b)
+
+            elif cmd == self.SHL:
+                self.alu("SHL", reg_a, reg_b)
+
+            elif cmd == self.SHR:
+                self.alu("SHR", reg_a, reg_b)
+
+            elif cmd == self.MOD:
+                check = self.alu("MOD", reg_a, reg_b)
+                if check == 0:
+                    print('Error: divide by zero error, halting')
+                    running = False
+            
+
+            
+
+            
             self.pc += self.op_size
         
 
